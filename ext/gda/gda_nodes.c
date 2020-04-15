@@ -298,18 +298,6 @@ static VALUE rb_cInsert_values_list(VALUE self)
     return array;
 }
 
-static VALUE rb_cOperation_operator(VALUE self)
-{
-    GdaSqlOperation * st;
-
-    Data_Get_Struct(self, GdaSqlOperation, st);
-
-    if (st->operator_type)
-	return rb_str_new2(gda_sql_operation_operator_to_string(st->operator_type));
-
-    return Qnil;
-}
-
 static VALUE rb_cJoin_join_type(VALUE self)
 {
     GdaSqlSelectJoin * st;
@@ -414,6 +402,30 @@ static VALUE rb_cExpr_value(VALUE self)
     return rb_str_new2(gda_value_stringify(val));
 }
 
+static VALUE operation_set_operator(VALUE self, VALUE operator)
+{
+    const gchar *string = StringValuePtr(operator);
+    GdaSqlOperation *operation = NULL;
+    Data_Get_Struct(self, GdaSqlOperation, operation);
+
+    if(operation && string)
+        operation->operator_type = gda_sql_operation_operator_from_string(string);
+
+    return Qnil;
+}
+
+static VALUE operation_get_operator(VALUE self)
+{
+    VALUE return_value = Qnil;
+
+    GdaSqlOperation *operation = NULL;
+    Data_Get_Struct(self, GdaSqlOperation, operation);
+    if(operation && operation->operator_type)
+        return_value = rb_str_new2(gda_sql_operation_operator_to_string(operation->operator_type));
+
+    return return_value;
+}
+
 void Init_gda_nodes()
 {
     mNodes = rb_define_module_under(mGDA, "Nodes");
@@ -455,7 +467,8 @@ void Init_gda_nodes()
 
     cOperation = rb_define_class_under(mNodes, "Operation", cNode);
     WrapperMethod(cOperation, operands);
-    WrapperMethod(cOperation, operator);
+    rb_define_method(cOperation, "operator=", operation_set_operator, 1);
+    rb_define_method(cOperation, "operator", operation_get_operator, 0);
 
     cTarget = rb_define_class_under(mNodes, "Target", cNode);
     WrapperMethod(cTarget, expr);

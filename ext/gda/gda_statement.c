@@ -44,6 +44,37 @@ static VALUE structure(VALUE self)
     return Data_Wrap_Struct(cStructure, NULL, gda_sql_statement_free, sqlst);
 }
 
+static VALUE render(VALUE self)
+{
+    VALUE return_value = Qnil;
+
+    GdaSqlStatement *sqlstmt = NULL;
+    Data_Get_Struct(self, GdaSqlStatement, sqlstmt);
+    if(sqlstmt)
+    {
+        GdaStatement *stmt = gda_statement_new();
+        g_object_set(G_OBJECT(stmt), "structure", sqlstmt, NULL);
+
+        GError *error = NULL;
+        gchar *sql = gda_statement_to_sql(stmt, NULL, &error);
+
+        if(error)
+        {
+            g_error_free(error);
+            // TODO: rescue
+        }
+        else
+        {
+            return_value = rb_str_new2(sql);
+            g_free(sql);
+        }
+
+        g_object_unref(stmt);
+    }
+
+    return return_value;
+}
+
 void Init_gda_statement()
 {
     cStatement = rb_define_class_under(mSQL, "Statement", rb_cObject);
@@ -53,6 +84,7 @@ void Init_gda_statement()
     rb_define_method(cStatement, "structure", structure, 0);
     rb_define_method(cStructure, "ast", ast, 0);
     rb_define_method(cStructure, "sql", sql, 0);
+    rb_define_method(cStructure, "render", render, 0);
 }
 
 /* vim: set noet sws=4 sw=4: */

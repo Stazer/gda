@@ -402,26 +402,44 @@ static VALUE rb_cExpr_value(VALUE self)
     return rb_str_new2(gda_value_stringify(val));
 }
 
-static VALUE operation_set_operator(VALUE self, VALUE operator)
+static VALUE rb_cOperation_set_operands(VALUE self, VALUE operands)
+{
+    GdaSqlOperation *operation = NULL;
+    Data_Get_Struct(self, GdaSqlOperation, operation);
+
+    if(operation->operands)
+        g_slist_free_full(g_steal_pointer(&operation->operands), (GDestroyNotify) gda_sql_expr_free);
+
+    for(size_t i = 0; i < RARRAY_LEN(operands); ++i)
+    {
+        VALUE entry = rb_ary_entry(operands, i);
+        GdaSqlExpr *expr = NULL;
+        Data_Get_Struct(entry, GdaSqlExpr, expr);
+        operation->operands = g_slist_append(operation->operands, expr);
+    }
+
+    return Qnil;
+}
+
+static VALUE rb_cOperation_set_operator(VALUE self, VALUE operator)
 {
     const gchar *string = StringValuePtr(operator);
     GdaSqlOperation *operation = NULL;
     Data_Get_Struct(self, GdaSqlOperation, operation);
 
-    if(operation && string)
-        operation->operator_type = gda_sql_operation_operator_from_string(string);
+    operation->operator_type = gda_sql_operation_operator_from_string(string);
 
     return Qnil;
 }
 
-static VALUE operation_get_operator(VALUE self)
+static VALUE rb_cOperation_get_operator(VALUE self)
 {
     VALUE return_value = Qnil;
 
     GdaSqlOperation *operation = NULL;
     Data_Get_Struct(self, GdaSqlOperation, operation);
-    if(operation && operation->operator_type)
-        return_value = rb_str_new2(gda_sql_operation_operator_to_string(operation->operator_type));
+
+    return_value = rb_str_new2(gda_sql_operation_operator_to_string(operation->operator_type));
 
     return return_value;
 }
@@ -467,8 +485,9 @@ void Init_gda_nodes()
 
     cOperation = rb_define_class_under(mNodes, "Operation", cNode);
     WrapperMethod(cOperation, operands);
-    rb_define_method(cOperation, "operator=", operation_set_operator, 1);
-    rb_define_method(cOperation, "operator", operation_get_operator, 0);
+    rb_define_method(cOperation, "operands=", rb_cOperation_set_operands, 1);
+    rb_define_method(cOperation, "operator", rb_cOperation_get_operator, 0);
+    rb_define_method(cOperation, "operator=", rb_cOperation_set_operator, 1);
 
     cTarget = rb_define_class_under(mNodes, "Target", cNode);
     WrapperMethod(cTarget, expr);

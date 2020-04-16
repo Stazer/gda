@@ -402,6 +402,43 @@ static VALUE rb_cExpr_value(VALUE self)
     return rb_str_new2(gda_value_stringify(val));
 }
 
+static VALUE rb_cExpr_set_cond(VALUE self, VALUE cond)
+{
+    GdaSqlExpr *expr = NULL;
+    Data_Get_Struct(self, GdaSqlExpr, expr);
+    GdaSqlOperation *operation = NULL;
+    Data_Get_Struct(cond, GdaSqlOperation, operation);
+
+    expr->cond = operation;
+
+    return Qnil;
+}
+
+static VALUE rb_cFunction_set_function_name(VALUE self, VALUE function_name)
+{
+    return Qnil;
+}
+
+static VALUE rb_cFunction_set_args(VALUE self, VALUE args)
+{
+    GdaSqlFunction *function = NULL;
+    Data_Get_Struct(self, GdaSqlFunction, function);
+
+    if(function->args_list)
+        g_slist_free_full(g_steal_pointer(&function->args_list), (GDestroyNotify) gda_sql_expr_free);
+
+    for(size_t i = 0; i < RARRAY_LEN(args); ++i)
+    {
+        VALUE entry = rb_ary_entry(args, i);
+        GdaSqlExpr *expr = NULL;
+        Data_Get_Struct(entry, GdaSqlExpr, expr);
+        function->args_list = g_slist_append(function->args_list, expr);
+        gda_sql_any_part_set_parent(expr, function);
+    }
+
+    return Qnil;
+}
+
 static VALUE rb_cOperation_set_operands(VALUE self, VALUE operands)
 {
     GdaSqlOperation *operation = NULL;
@@ -472,6 +509,7 @@ void Init_gda_nodes()
     cExpr = rb_define_class_under(mNodes, "Expr", cNode);
     WrapperMethod(cExpr, func);
     WrapperMethod(cExpr, cond);
+    rb_define_method(cExpr, "cond=", rb_cExpr_set_cond, 1);
     WrapperMethod(cExpr, select);
     WrapperMethod(cExpr, case_s);
     WrapperMethod(cExpr, param_spec);

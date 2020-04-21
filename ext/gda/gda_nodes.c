@@ -26,8 +26,8 @@ VALUE cCommit;
 VALUE cCompound;
 
 #define node_deallocate(node, deallocator) \
-    if(!GDA_SQL_ANY_PART(node)->parent) \
-      deallocator(node);
+    if(!GDA_SQL_ANY_PART(node)->parent)    \
+        ;//deallocator(node);
 
 #define WrapInteger(klass, type, lname) \
     static VALUE rb_##klass##_##lname(VALUE self) \
@@ -174,6 +174,10 @@ static VALUE Wrap(VALUE stmt, VALUE klass, GdaSqlAnyPart *part)
     return obj;
 }
 
+static void rb_cOperation_deallocate(GdaSqlOperation *);
+static void rb_cExpr_deallocate(GdaSqlExpr *);
+static void rb_cFunction_deallocate(GdaSqlFunction *);
+
 VALUE WrapAnyPart(VALUE stmt, GdaSqlAnyPart *part)
 {
     if (!part)
@@ -220,7 +224,7 @@ VALUE WrapAnyPart(VALUE stmt, GdaSqlAnyPart *part)
 	    return Wrap(stmt, cSelectField, part);
 	    break;
 	case GDA_SQL_ANY_EXPR:
-	    return Wrap(stmt, cExpr, part);
+        return Data_Wrap_Struct(cExpr, NULL, rb_cExpr_deallocate, part);
 	    break;
 	case GDA_SQL_ANY_SQL_FIELD:
 	    return Wrap(stmt, cField, part);
@@ -232,10 +236,10 @@ VALUE WrapAnyPart(VALUE stmt, GdaSqlAnyPart *part)
 	    return Wrap(stmt, cTable, part);
 	    break;
 	case GDA_SQL_ANY_SQL_OPERATION:
-	    return Wrap(stmt, cOperation, part);
+        return Data_Wrap_Struct(cOperation, NULL, rb_cOperation_deallocate, part);
 	    break;
 	case GDA_SQL_ANY_SQL_FUNCTION:
-	    return Wrap(stmt, cFunction, part);
+        return Data_Wrap_Struct(cFunction, NULL, rb_cFunction_deallocate, part);
 	    break;
 	case GDA_SQL_ANY_SQL_SELECT_TARGET:
 	    return Wrap(stmt, cTarget, part);
@@ -438,9 +442,11 @@ static VALUE rb_cExpr_set_cond(VALUE self, VALUE cond)
     GdaSqlOperation *operation = NULL;
 
     if(!NIL_P(cond))
+    {
         Data_Get_Struct(cond, GdaSqlOperation, operation);
+        gda_sql_any_part_set_parent(operation, expr);
+    }
 
-    gda_sql_operation_free(expr->cond);
     expr->cond = operation;
 
     return Qnil;
@@ -463,14 +469,14 @@ static VALUE rb_cExpr_set_func(VALUE self, VALUE func)
     return Qnil;
 }
 
-static void function_deallocate(GdaSqlFunction *function)
+static void rb_cFunction_deallocate(GdaSqlFunction *function)
 {
     node_deallocate(function, gda_sql_function_free);
 }
 
 static VALUE rb_cFunction_allocate(VALUE self)
 {
-    return Data_Wrap_Struct(cFunction, NULL, function_deallocate, gda_sql_function_new(NULL));
+    return Data_Wrap_Struct(cFunction, NULL, rb_cFunction_deallocate, gda_sql_function_new(NULL));
 }
 
 static VALUE rb_cFunction_set_function_name(VALUE self, VALUE function_name)
@@ -504,14 +510,14 @@ static VALUE rb_cFunction_set_args_list(VALUE self, VALUE args_list)
     return Qnil;
 }
 
-static void operation_deallocate(GdaSqlOperation *operation)
+static void rb_cOperation_deallocate(GdaSqlOperation *operation)
 {
     node_deallocate(operation, gda_sql_operation_free);
 }
 
 static VALUE rb_cOperation_allocate(VALUE self)
 {
-    return Data_Wrap_Struct(cOperation, NULL, gda_sql_operation_free, gda_sql_operation_new(NULL));
+    return Data_Wrap_Struct(cOperation, NULL, rb_cOperation_deallocate, gda_sql_operation_new(NULL));
 }
 
 static VALUE rb_cOperation_set_operands(VALUE self, VALUE operands)
@@ -528,6 +534,7 @@ static VALUE rb_cOperation_set_operands(VALUE self, VALUE operands)
         GdaSqlExpr *expr = NULL;
         Data_Get_Struct(entry, GdaSqlExpr, expr);
         operation->operands = g_slist_append(operation->operands, expr);
+        gda_sql_any_part_set_parent(expr, operation);
     }
 
     return Qnil;
